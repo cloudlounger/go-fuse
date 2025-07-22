@@ -103,14 +103,17 @@ func (n *LoopbackNode) Statfs(ctx context.Context, out *fuse.StatfsOut) syscall.
 // path returns the full path to the file in the underlying file
 // system.
 func (n *LoopbackNode) root() *Inode {
-	var rootNode *Inode
-	if n.RootData.RootNode != nil {
-		rootNode = n.RootData.RootNode.EmbeddedInode()
-	} else {
-		rootNode = n.Root()
+	//var rootNode *Inode
+	//if n.RootData.RootNode != nil {
+	//	rootNode = n.RootData.RootNode.EmbeddedInode()
+	//} else {
+	//	rootNode = n.Root()
+	//}
+	// return rootNode
+	if n.RootData.RootNode == nil {
+		panic("LoopbackNode: RootData.RootNode is nil")
 	}
-
-	return rootNode
+	return n.RootData.RootNode.EmbeddedInode()
 }
 
 // relativePath returns the path the node, relative to to the root directory
