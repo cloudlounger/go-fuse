@@ -713,6 +713,7 @@ func (b *rawBridge) Access(cancel <-chan struct{}, input *fuse.AccessIn) fuse.St
 // Extended attributes.
 
 func (b *rawBridge) GetXAttr(cancel <-chan struct{}, header *fuse.InHeader, attr string, data []byte) (uint32, fuse.Status) {
+	fmt.Printf("rawBridge.GetXAttr, header %+v, attr %s\n", header, attr)
 	n, _ := b.inode(header.NodeId, 0)
 
 	if xops, ok := n.ops.(NodeGetxattrer); ok {

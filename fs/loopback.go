@@ -498,6 +498,9 @@ var _ = (NodeGetxattrer)((*LoopbackNode)(nil))
 
 func (n *LoopbackNode) Getxattr(ctx context.Context, attr string, dest []byte) (uint32, syscall.Errno) {
 	sz, err := unix.Lgetxattr(n.path(), attr, dest)
+	if err != nil {
+		fmt.Printf("LoopbackNode.Getxattr, path %s attr %s err %v\n", n.path(), attr, err)
+	}
 	return uint32(sz), ToErrno(err)
 }
 
