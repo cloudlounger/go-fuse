@@ -6,6 +6,7 @@ package fs
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"runtime/debug"
 	"sync"
@@ -373,11 +374,17 @@ func (b *rawBridge) Lookup(cancel <-chan struct{}, header *fuse.InHeader, name s
 
 func (b *rawBridge) lookup(ctx *fuse.Context, parent *Inode, name string, out *fuse.EntryOut) (*Inode, syscall.Errno) {
 	if lu, ok := parent.ops.(NodeLookuper); ok {
-		return lu.Lookup(ctx, name, out)
+		_inode, _errno := lu.Lookup(ctx, name, out)
+		if _errno != 0 {
+			fmt.Printf("lookup.parent.NodeLookuper %s errno %d\n", name, _errno)
+		}
+		return _inode, _errno
+		//return lu.Lookup(ctx, name, out)
 	}
 
 	child := parent.GetChild(name)
 	if child == nil {
+		fmt.Printf("lookup.parent.GetChild %s errno %d\n", name, syscall.ENOENT)
 		return nil, syscall.ENOENT
 	}
 
@@ -386,6 +393,8 @@ func (b *rawBridge) lookup(ctx *fuse.Context, parent *Inode, name string, out *f
 		errno := ga.Getattr(ctx, nil, &a)
 		if errno == 0 {
 			out.Attr = a.Attr
+		} else {
+			fmt.Printf("lookup.child.NodeGetattrer %s errno %d\n", name, errno)
 		}
 	}
 
@@ -1076,6 +1085,7 @@ func (b *rawBridge) ReadDir(cancel <-chan struct{}, input *fuse.ReadIn, out *fus
 }
 
 func (b *rawBridge) readDirMaybeLookup(cancel <-chan struct{}, input *fuse.ReadIn, out *fuse.DirEntryList, lookup bool) fuse.Status {
+	fmt.Printf("rawBridge.readDirMaybeLookup, input %v, lookup %v\n", input, lookup)
 	n, f := b.inode(input.NodeId, input.Fh)
 
 	direnter, ok := f.file.(FileReaddirenter)
@@ -1117,6 +1127,7 @@ func (b *rawBridge) readDirMaybeLookup(cancel <-chan struct{}, input *fuse.ReadI
 		if sd, ok := f.file.(FileSeekdirer); ok {
 			errno := sd.Seekdir(ctx, input.Offset)
 			if errno != 0 {
+				fmt.Printf("rawBridge.readDirMaybeLookup.Seekdir, errno %d\n", errno)
 				return errnoToStatus(errno)
 			}
 			f.dirOffset = input.Offset
@@ -1194,6 +1205,7 @@ func (b *rawBridge) readDirMaybeLookup(cancel <-chan struct{}, input *fuse.ReadI
 
 		child, errno := b.lookup(ctx, n, de.Name, entryOut)
 		if errno != 0 {
+			fmt.Printf("rawBridge.readDirMaybeLookup.lookup, name %s, errno %d\n", de.Name, errno)
 			if b.options.NegativeTimeout != nil {
 				entryOut.SetEntryTimeout(*b.options.NegativeTimeout)
 

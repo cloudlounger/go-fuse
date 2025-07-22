@@ -6,6 +6,7 @@ package fs
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -362,6 +363,7 @@ func (n *LoopbackNode) Open(ctx context.Context, flags uint32) (fh FileHandle, f
 
 	f, err := openat.OpenSymlinkAware(n.RootData.Path, n.relativePath(), int(flags), 0)
 	if err != nil {
+		fmt.Printf("LoopbackNode.Open, path %s err %v\n", n.path(), err)
 		return nil, 0, ToErrno(err)
 	}
 	lf := NewLoopbackFile(f)
@@ -389,7 +391,12 @@ var _ = (NodeGetattrer)((*LoopbackNode)(nil))
 func (n *LoopbackNode) Getattr(ctx context.Context, f FileHandle, out *fuse.AttrOut) syscall.Errno {
 	if f != nil {
 		if fga, ok := f.(FileGetattrer); ok {
-			return fga.Getattr(ctx, out)
+			_errno := fga.Getattr(ctx, out)
+			if _errno != 0 {
+				fmt.Printf("LoopbackNode.Getattr fga.Getattr, f %v out %v errno %d\n", f, out, _errno)
+			}
+			return _errno
+			//return fga.Getattr(ctx, out)
 		}
 	}
 
@@ -404,6 +411,7 @@ func (n *LoopbackNode) Getattr(ctx context.Context, f FileHandle, out *fuse.Attr
 	}
 
 	if err != nil {
+		fmt.Printf("LoopbackNode.Getattr.syscall.Stat, p %s, inode=root %v, err %v\n", p, &n.Inode == n.Root(), err)
 		return ToErrno(err)
 	}
 	out.FromStat(&st)

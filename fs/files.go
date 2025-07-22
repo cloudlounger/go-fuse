@@ -6,6 +6,7 @@ package fs
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"syscall"
 	"unsafe"
@@ -236,6 +237,7 @@ func (f *loopbackFile) Getattr(ctx context.Context, a *fuse.AttrOut) syscall.Err
 	st := syscall.Stat_t{}
 	err := syscall.Fstat(f.fd, &st)
 	if err != nil {
+		fmt.Printf("loopbackFile.Getattr st %+v errno %d\n", st, ToErrno(err))
 		return ToErrno(err)
 	}
 	a.FromStat(&st)
