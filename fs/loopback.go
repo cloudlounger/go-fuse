@@ -260,7 +260,7 @@ func (n *LoopbackNode) Create(ctx context.Context, name string, flags uint32, mo
 
 	node := n.RootData.newNode(n.EmbeddedInode(), name, &st)
 	fuse_st := n.RootData.idFromStat(&st)
-	fmt.Printf("LoopbackNode.Create, name %s, st %+v, fuse_st:{ino:%d, gen:%d}, replace %+v\n", name, st, fuse_st.Ino, fuse_st.Gen, idFromStat(&st, n.RootData.Dev))
+	fmt.Printf("LoopbackNode.Create, name %s, st %+v, fuse_st:{ino:%d, gen:%d}, rootDataDev %d\n", name, st, fuse_st.Ino, fuse_st.Gen, n.RootData.Dev)
 	ch := n.NewInode(ctx, node, fuse_st)
 	lf := NewLoopbackFile(fd)
 
@@ -567,21 +567,18 @@ func NewLoopbackRoot(rootPath string) (InodeEmbedder, error) {
 	return rootNode, nil
 }
 
-func idFromStat(st *syscall.Stat_t, rdev uint64) StableAttr {
-	// We compose an inode number by the underlying inode, and
-	// mixing in the device number. In traditional filesystems,
-	// the inode numbers are small. The device numbers are also
-	// small (typically 16 bit). Finally, we mask out the root
-	// device number of the root, so a loopback FS that does not
-	// encompass multiple mounts will reflect the inode numbers of
-	// the underlying filesystem
-	swapped := (uint64(st.Dev) << 32) | (uint64(st.Dev) >> 32)
-	swappedRootDev := (rdev << 32) | (rdev >> 32)
-	return StableAttr{
-		Mode: uint32(st.Mode),
-		Gen:  1,
-		// This should work well for traditional backing FSes,
-		// not so much for other go-fuse FS-es
-		Ino: (swapped ^ swappedRootDev) ^ st.Ino,
+func NewLoopbackRootWithoutDev(rootPath string) (InodeEmbedder, error) {
+	var st syscall.Stat_t
+	err := syscall.Stat(rootPath, &st)
+	if err != nil {
+		return nil, err
 	}
+
+	root := &LoopbackRoot{
+		Path: rootPath,
+	}
+	fmt.Printf("NewLoopbackRoot, rootPath %s, dev %d, st %+v\n", rootPath, root.Dev, st)
+	rootNode := root.newNode(nil, "", &st)
+	root.RootNode = rootNode
+	return rootNode, nil
 }
