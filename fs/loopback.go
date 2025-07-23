@@ -172,7 +172,7 @@ func (n *LoopbackNode) Mknod(ctx context.Context, name string, mode, rdev uint32
 	}
 
 	out.Attr.FromStat(&st)
-
+	fmt.Printf("LoopbackNode.Mknod, path %s, mode %d, rdev %d， st %+v\n", p, mode, rdev, st)
 	node := n.RootData.newNode(n.EmbeddedInode(), name, &st)
 	ch := n.NewInode(ctx, node, n.RootData.idFromStat(&st))
 
@@ -554,7 +554,7 @@ func NewLoopbackRoot(rootPath string) (InodeEmbedder, error) {
 		Path: rootPath,
 		Dev:  uint64(st.Dev),
 	}
-
+	fmt.Printf("NewLoopbackRoot, rootPath %s, dev %d, st %+v\n", rootPath, root.Dev, st)
 	rootNode := root.newNode(nil, "", &st)
 	root.RootNode = rootNode
 	return rootNode, nil
