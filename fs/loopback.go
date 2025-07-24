@@ -545,3 +545,19 @@ func NewLoopbackRoot(rootPath string) (InodeEmbedder, error) {
 	root.RootNode = rootNode
 	return rootNode, nil
 }
+
+func NewLoopbackRootWithoutDev(rootPath string) (InodeEmbedder, error) {
+	var st syscall.Stat_t
+	err := syscall.Stat(rootPath, &st)
+	if err != nil {
+		return nil, err
+	}
+
+	root := &LoopbackRoot{
+		Path: rootPath,
+	}
+
+	rootNode := root.newNode(nil, "", &st)
+	root.RootNode = rootNode
+	return rootNode, nil
+}
