@@ -6,6 +6,7 @@ package fs
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -108,7 +109,6 @@ func (n *LoopbackNode) root() *Inode {
 	} else {
 		rootNode = n.Root()
 	}
-
 	return rootNode
 }
 
@@ -135,7 +135,9 @@ func (n *LoopbackNode) Lookup(ctx context.Context, name string, out *fuse.EntryO
 
 	out.Attr.FromStat(&st)
 	node := n.RootData.newNode(n.EmbeddedInode(), name, &st)
-	ch := n.NewInode(ctx, node, n.RootData.idFromStat(&st))
+	fuse_st := n.RootData.idFromStat(&st)
+	fmt.Printf("LoopbackNode.Lookup, path %s, name %s, st %+v, ist %+v\n", p, name, st, fuse_st)
+	ch := n.NewInode(ctx, node, fuse_st)
 	return ch, 0
 }
 
@@ -168,9 +170,10 @@ func (n *LoopbackNode) Mknod(ctx context.Context, name string, mode, rdev uint32
 	}
 
 	out.Attr.FromStat(&st)
-
 	node := n.RootData.newNode(n.EmbeddedInode(), name, &st)
-	ch := n.NewInode(ctx, node, n.RootData.idFromStat(&st))
+	fuse_st := n.RootData.idFromStat(&st)
+	fmt.Printf("LoopbackNode.Mknod, name %s, rdev %d, st %+v, ist %+v\n", name, rdev, st, fuse_st)
+	ch := n.NewInode(ctx, node, fuse_st)
 
 	return ch, 0
 }
@@ -193,7 +196,9 @@ func (n *LoopbackNode) Mkdir(ctx context.Context, name string, mode uint32, out 
 	out.Attr.FromStat(&st)
 
 	node := n.RootData.newNode(n.EmbeddedInode(), name, &st)
-	ch := n.NewInode(ctx, node, n.RootData.idFromStat(&st))
+	fuse_st := n.RootData.idFromStat(&st)
+	fmt.Printf("LoopbackNode.Mkdir, name %s, st %+v, ist %+v\n", name, st, fuse_st)
+	ch := n.NewInode(ctx, node, fuse_st)
 
 	return ch, 0
 }
@@ -254,7 +259,9 @@ func (n *LoopbackNode) Create(ctx context.Context, name string, flags uint32, mo
 	}
 
 	node := n.RootData.newNode(n.EmbeddedInode(), name, &st)
-	ch := n.NewInode(ctx, node, n.RootData.idFromStat(&st))
+	fuse_st := n.RootData.idFromStat(&st)
+	fmt.Printf("LoopbackNode.Create, name %s, st %+v, fuse_st:{ino:%d, gen:%d}, rootDataDev %d\n", name, st, fuse_st.Ino, fuse_st.Gen, n.RootData.Dev)
+	ch := n.NewInode(ctx, node, fuse_st)
 	lf := NewLoopbackFile(fd)
 
 	out.FromStat(&st)
@@ -309,7 +316,9 @@ func (n *LoopbackNode) Symlink(ctx context.Context, target, name string, out *fu
 		return nil, ToErrno(err)
 	}
 	node := n.RootData.newNode(n.EmbeddedInode(), name, &st)
-	ch := n.NewInode(ctx, node, n.RootData.idFromStat(&st))
+	fuse_st := n.RootData.idFromStat(&st)
+	fmt.Printf("LoopbackNode.Symlink, name %s, st %+v, ist %+v\n", name, st, fuse_st)
+	ch := n.NewInode(ctx, node, fuse_st)
 
 	out.Attr.FromStat(&st)
 	return ch, 0
@@ -330,7 +339,9 @@ func (n *LoopbackNode) Link(ctx context.Context, target InodeEmbedder, name stri
 		return nil, ToErrno(err)
 	}
 	node := n.RootData.newNode(n.EmbeddedInode(), name, &st)
-	ch := n.NewInode(ctx, node, n.RootData.idFromStat(&st))
+	fuse_st := n.RootData.idFromStat(&st)
+	fmt.Printf("LoopbackNode.Link, name %s, st %+v, ist %+v\n", name, st, fuse_st)
+	ch := n.NewInode(ctx, node, fuse_st)
 
 	out.Attr.FromStat(&st)
 	return ch, 0
@@ -362,6 +373,7 @@ func (n *LoopbackNode) Open(ctx context.Context, flags uint32) (fh FileHandle, f
 
 	f, err := openat.OpenSymlinkAware(n.RootData.Path, n.relativePath(), int(flags), 0)
 	if err != nil {
+		fmt.Printf("LoopbackNode.Open, path %s err %v\n", n.path(), err)
 		return nil, 0, ToErrno(err)
 	}
 	lf := NewLoopbackFile(f)
@@ -389,7 +401,12 @@ var _ = (NodeGetattrer)((*LoopbackNode)(nil))
 func (n *LoopbackNode) Getattr(ctx context.Context, f FileHandle, out *fuse.AttrOut) syscall.Errno {
 	if f != nil {
 		if fga, ok := f.(FileGetattrer); ok {
-			return fga.Getattr(ctx, out)
+			_errno := fga.Getattr(ctx, out)
+			if _errno != 0 {
+				fmt.Printf("LoopbackNode.Getattr fga.Getattr, f %v out %v errno %d\n", f, out, _errno)
+			}
+			return _errno
+			//return fga.Getattr(ctx, out)
 		}
 	}
 
@@ -404,6 +421,7 @@ func (n *LoopbackNode) Getattr(ctx context.Context, f FileHandle, out *fuse.Attr
 	}
 
 	if err != nil {
+		fmt.Printf("LoopbackNode.Getattr.syscall.Stat, p %s, inode=root %v, err %v\n", p, &n.Inode == n.Root(), err)
 		return ToErrno(err)
 	}
 	out.FromStat(&st)
@@ -490,6 +508,9 @@ var _ = (NodeGetxattrer)((*LoopbackNode)(nil))
 
 func (n *LoopbackNode) Getxattr(ctx context.Context, attr string, dest []byte) (uint32, syscall.Errno) {
 	sz, err := unix.Lgetxattr(n.path(), attr, dest)
+	if err != nil {
+		fmt.Printf("LoopbackNode.Getxattr, path %s attr %s err %v\n", n.path(), attr, err)
+	}
 	return uint32(sz), ToErrno(err)
 }
 
@@ -540,7 +561,23 @@ func NewLoopbackRoot(rootPath string) (InodeEmbedder, error) {
 		Path: rootPath,
 		Dev:  uint64(st.Dev),
 	}
+	fmt.Printf("NewLoopbackRoot, rootPath %s, dev %d, st %+v\n", rootPath, root.Dev, st)
+	rootNode := root.newNode(nil, "", &st)
+	root.RootNode = rootNode
+	return rootNode, nil
+}
 
+func NewLoopbackRootWithoutDev(rootPath string) (InodeEmbedder, error) {
+	var st syscall.Stat_t
+	err := syscall.Stat(rootPath, &st)
+	if err != nil {
+		return nil, err
+	}
+
+	root := &LoopbackRoot{
+		Path: rootPath,
+	}
+	fmt.Printf("NewLoopbackRoot, rootPath %s, dev %d, st %+v\n", rootPath, root.Dev, st)
 	rootNode := root.newNode(nil, "", &st)
 	root.RootNode = rootNode
 	return rootNode, nil
